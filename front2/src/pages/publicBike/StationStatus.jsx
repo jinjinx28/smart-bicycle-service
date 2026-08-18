@@ -16,7 +16,10 @@ export default function StationStatus() {
   useEffect(() => {
     publicBikeService.getStations().then((res) => {
       setData(res);
-    });
+    })
+      .catch(() => {
+        setData({ stations: [], hourlyUsage: [] });
+      });
   }, []);
 
   if (!data) return <Loading />;
