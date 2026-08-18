@@ -5,98 +5,85 @@ API_KEY = "4b744d45785a696e3132396c43746c56"
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CSV_PATH = BASE_DIR / "seoul_bike_stations.csv"
 
-_CACHED_STATIONS = None
-_CACHED_ROUTES = None
+# 전역 캐시 변수 (최초 1회만 로드하여 메모리에 보관)
+_CACHED_STATIONS = []
+_CACHED_ROUTES = []
+
+def load_csv_data_once():
+    global _CACHED_STATIONS
+    if _CACHED_STATIONS:
+        return _CACHED_STATIONS
+
+    df = pd.DataFrame()
+    if CSV_PATH.exists():
+        for enc in ('utf-8', 'cp949', 'euc-kr'):
+            try:
+                # 상위 100개만 딱 읽고 즉시 차단
+                df = pd.read_csv(CSV_PATH, encoding=enc, nrows=100)
+                break
+            except Exception:
+                continue
+
+    stations = []
+    if not df.empty:
+        fallback_names = [
+            "여의도 한강공원", "반포 한강공원", "뚝섬 유원지", "망원 한강공원", 
+            "잠실철교 남단", "서울숲 공원", "광나루 한강공원", "상암 월드컵공원", 
+            "양화 한강공원", "선유도 공원", "청계광장", "DDP 동대문디자인플라자"
+        ]
+        
+        for idx, row in df.iterrows():
+            station_id = str(row.get("대여소번호") or row.get("RENT_ID") or f"ST-{idx+1}").strip()
+
+            raw_name = row.get("보관소(대여소)명") or row.get("대여소명") or row.get("RENT_NM") or row.get("name")
+            name = str(raw_name).strip() if not pd.isna(raw_name) else ""
+            if not name or name == "nan":
+                name = fallback_names[idx % len(fallback_names)]
+
+            raw_bikes = row.get("거치대수") or row.get("HOLD_NUM") or row.get("parkingBikeTotCnt")
+            try:
+                available = int(float(raw_bikes)) if not pd.isna(raw_bikes) else (idx * 3) % 20
+            except (ValueError, TypeError):
+                available = (idx * 3) % 20
+
+            total = 20
+            status = "GOOD" if available >= 5 else ("LOW" if available > 0 else "EMPTY")
+
+            try:
+                lat = float(row.get("위도") or row.get("STA_LAT") or 37.55)
+            except (ValueError, TypeError):
+                lat = 37.55
+
+            try:
+                lng = float(row.get("경도") or row.get("STA_LONG") or 126.97)
+            except (ValueError, TypeError):
+                lng = 126.97
+
+            stations.append({
+                "id": station_id,
+                "name": name,
+                "bikes": available,
+                "available": available,
+                "total": total,
+                "status": status,
+                "distance": f"{(idx % 5) * 0.4 + 0.5:.1f}km",
+                "lat": lat,
+                "lng": lng
+            })
+            
+    _CACHED_STATIONS = stations
+    return _CACHED_STATIONS
+
+# 서버 시작 시 미리 한 번 로드하여 캐싱
+load_csv_data_once()
 
 def fetch_stations() -> list[dict]:
-    global _CACHED_STATIONS
-    if _CACHED_STATIONS is not None:
-        return _CACHED_STATIONS
-
-    try:
-        df = pd.DataFrame()
-        if CSV_PATH.exists():
-            for enc in ('utf-8', 'cp949'):
-                try:
-                    df = pd.read_csv(CSV_PATH, encoding=enc, nrows=200)
-                    break
-                except Exception:
-                    continue
-
-        stations = []
-        if not df.empty:
-            fallback_names = [
-                "여의도 한강공원", "반포 한강공원", "뚝섬 유원지", "망원 한강공원", 
-                "잠실철교 남단", "서울숲 공원", "광나루 한강공원", "상암 월드컵공원", 
-                "양화 한강공원", "선유도 공원", "청계광장", "DDP 동대문디자인플라자"
-            ]
-            
-            for idx, row in df.iterrows():
-                raw_bikes = row.get("HOLD_NUM")
-                if pd.isna(raw_bikes):
-                    raw_bikes = row.get("bikes", 0)
-                try:
-                    available = int(raw_bikes)
-                except (ValueError, TypeError):
-                    available = 0
-
-                raw_total = row.get("RACK_TOT_CNT")
-                try:
-                    total = int(raw_total)
-                except (ValueError, TypeError):
-                    total = 20
-
-                status = "GOOD" if available >= 5 else ("LOW" if available > 0 else "EMPTY")
-
-                raw_name = row.get("RENT_NM")
-                if pd.isna(raw_name):
-                    raw_name = row.get("name")
-                if pd.isna(raw_name):
-                    raw_name = row.get("stationName")
-                
-                name = str(raw_name).strip() if not pd.isna(raw_name) else ""
-                if not name or name == "nan":
-                    name = fallback_names[idx % len(fallback_names)]
-
-                raw_lat = row.get("STA_LAT")
-                if pd.isna(raw_lat):
-                    raw_lat = row.get("lat", 0.0)
-                try:
-                    lat = float(raw_lat)
-                except (ValueError, TypeError):
-                    lat = 0.0
-
-                raw_long = row.get("STA_LONG")
-                if pd.isna(raw_long):
-                    raw_long = row.get("lng", 0.0)
-                try:
-                    lng = float(raw_long)
-                except (ValueError, TypeError):
-                    lng = 0.0
-
-                stations.append({
-                    "id": str(row.get("RENT_ID", f"ST-{idx+1}")),
-                    "name": name,
-                    "bikes": available,
-                    "available": available,
-                    "total": total,
-                    "status": status,
-                    "distance": "1.2km",
-                    "lat": lat,
-                    "lng": lng
-                })
-        
-        _CACHED_STATIONS = stations
-        return _CACHED_STATIONS
-    except Exception as e:
-        print(f"CSV 읽기 에러: {e}")
-
-    return []
+    return load_csv_data_once()
 
 def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str = None):
     global _CACHED_ROUTES
     
-    if _CACHED_ROUTES is None:
+    if not _CACHED_ROUTES:
         stations = fetch_stations()
         if not stations:
             return []
@@ -104,10 +91,6 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
         types_pool = ["로드", "MTB", "그래벨", "투어링", "도심"]
         difficulties_pool = ["입문", "중급", "고급", "도전"]
         regions_pool = ["서울", "경기", "인천", "강원", "부산", "제주", "전남"]
-        fallback_names = [
-            "여의도 한강공원", "반포 한강공원", "뚝섬 유원지", "망원 한강공원", 
-            "잠실철교 남단", "서울숲 공원", "광나루 한강공원", "상암 월드컵공원"
-        ]
 
         routes = []
         for idx, station in enumerate(stations[:50]):
@@ -116,8 +99,6 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
             assigned_diff = difficulties_pool[idx % len(difficulties_pool)]
             
             current_station_name = station.get('name')
-            if not current_station_name or current_station_name == "알 수 없는 대여소":
-                current_station_name = fallback_names[idx % len(fallback_names)]
 
             routes.append({
                 "id": idx + 1,
