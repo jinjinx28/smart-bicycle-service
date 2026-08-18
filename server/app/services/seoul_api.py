@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import pandas as pd
 
@@ -37,6 +38,9 @@ def load_csv_data_once():
 
             raw_name = row.get("보관소(대여소)명") or row.get("대여소명") or row.get("RENT_NM") or row.get("name")
             name = str(raw_name).strip() if not pd.isna(raw_name) else ""
+            
+            name = re.sub(r'^\d+[\.\s]*', '', name).strip()
+
             if not name or name == "nan":
                 name = fallback_names[idx % len(fallback_names)]
 
