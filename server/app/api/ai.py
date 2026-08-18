@@ -16,7 +16,6 @@ except Exception as e:
 @router.get("/bike/analysis")
 def get_analysis_data():
     try:
-        print("📥 [API] /ai/bike/analysis 요청 수신됨")
         result = get_bike_analysis_data()
         return result
     except Exception as e:

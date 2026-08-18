@@ -14,14 +14,14 @@ import {
 // GET /bike/seoul/summary
 async function getSummary() {
   try {
-    const response = await api.get("/bike/seoul/summary");
+    const response = await api.get("/bike/seoul/summary", { timeout: 8000 });
     const resData = response.data;
     const summaryData = resData?.data ?? resData;
 
     const totalBikes = summaryData?.total_bikes ?? 100;
     const activeStations = summaryData?.active_stations ?? 20;
 
-    const result = [
+    return [
       {
         label: "오늘 총 대여",
         value: `${totalBikes.toLocaleString()}대`,
@@ -43,29 +43,26 @@ async function getSummary() {
         change: "-1.8%",
       },
     ];
-    return result;
   } catch (err) {
     console.error("[Summary API 에러]:", err);
-    return [
-      { label: "오늘 총 대여", value: "100대", change: "0%" },
-      { label: "운영 대여소", value: "20개소", change: "0%" },
-      { label: "현재 이용 중", value: "0대", change: "0%" },
-      { label: "평균 이용 시간", value: "0분", change: "0%" },
-    ];
+    throw err;
   }
 }
 
 // GET /bike/seoul/routes
 async function getBikeRoutes() {
   try {
-    const { data } = await api.get("/bike/seoul/routes");
-    if (!Array.isArray(data) || data.length === 0) {
-      return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
+    const response = await api.get("/bike/seoul/routes", { timeout: 3000 });
+    const resData = response.data;
+    const data = resData?.data ?? resData;
+
+    if (!Array.isArray(data)) {
+      return [];
     }
     return data;
   } catch (err) {
     console.error("[Routes API 에러]:", err);
-    return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
+    throw err;
   }
 }
 
@@ -79,7 +76,7 @@ async function getStations() {
     };
   } catch (err) {
     console.error("[Stations API 에러]:", err);
-    return { stations: STATIONS_MOCK, hourlyUsage: HOURLY_USAGE };
+    throw err;
   }
 }
 
@@ -91,21 +88,15 @@ async function getAnalysis() {
     const data = response.data;
     const analysisData = data?.data ?? data; 
     
-    const result = {
+    return {
       monthlyUsage: analysisData?.monthlyUsage ?? MONTHLY_USAGE,
       topStations: analysisData?.topStations ?? TOP_STATIONS,
       ageDistribution: analysisData?.ageDistribution ?? AGE_DISTRIBUTION,
       insights: analysisData?.insights ?? AI_INSIGHTS,
     };
-    return result;
   } catch (err) { 
     console.error("[Analysis API 에러]:", err);
-    return {
-      monthlyUsage: MONTHLY_USAGE,
-      topStations: TOP_STATIONS,
-      ageDistribution: AGE_DISTRIBUTION,
-      insights: AI_INSIGHTS,
-    };
+    throw err;
   }
 }
 
@@ -140,16 +131,7 @@ async function getForecast({
     return data;
   } catch (err) {
     console.error("[Forecast API 에러]:", err);
-    return mockForecast({
-      stationId,
-      isHoliday,
-      temperature,
-      rainfall,
-      windSpeed,
-      recentHourlyRentals,
-      prevDaySameHourRentals,
-      rolling7dSameHourAvg,
-    });
+    throw err;
   }
 }
 
