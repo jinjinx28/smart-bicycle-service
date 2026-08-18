@@ -25,7 +25,13 @@ async function getSummary() {
 async function getBikeRoutes() {
   try {
     const { data } = await api.get("/bike/seoul/routes");
-    return data;
+    const rawList = extractData(data, []);
+
+    // 데이터가 비어있다면 Mock 데이터로 대체
+    if (!Array.isArray(rawList) || rawList.length === 0) {
+      return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
+    }
+    return rawList;
   } catch {
     return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
   }
