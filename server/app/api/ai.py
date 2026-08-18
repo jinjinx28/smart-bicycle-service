@@ -1,9 +1,9 @@
 import joblib
 import pandas as pd
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from typing import Optional, Any
-from app.services.ai_models import get_bike_analysis_data
+from app.services.ai_models import get_bike_analysis_data, predict_demand
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -12,11 +12,17 @@ try:
     rf_model = joblib.load("bike_rf_model.pkl")
 except Exception as e:
     rf_model = None
-    print(f"경고: 머신러닝 모델 파일을 불러오지 못했습니다. ({e})")
 
 @router.get("/bike/analysis")
-def get_bike_analysis():
-    return {"status": "success", "data": get_bike_analysis_data()}
+def get_analysis_data():
+    try:
+        print("📥 [API] /ai/bike/analysis 요청 수신됨")
+        result = get_bike_analysis_data()
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 예측 요청을 위한 스키마 정의
 class ForecastRequest(BaseModel):
@@ -66,9 +72,6 @@ def predict_bike_demand(payload: ForecastRequest):
     temp = safe_float(payload.temperature, 20.0)
     rain = safe_float(payload.rainfall, 0.0)
     wind_speed = safe_float(payload.wind_speed, 2.0)
-
-    # 디버깅용 로그
-    print(f"[요청 데이터 수신] 시간(hour): {hour}, 기온(temp): {temp}, 강수(rain): {rain}, 풍속(wind): {wind_speed}")
 
     # 머신러닝 모델을 이용한 수요 예측 
     if rf_model is not None:

@@ -11,7 +11,7 @@ export default function AIAnalysis() {
   useEffect(() => {
     publicBikeService.getAnalysis()
       .then((res) => {
-        setData(res.data);
+        setData(res);
       })
       .catch((err) => {
       });

@@ -11,33 +11,65 @@ import {
   FORECAST_STATIONS,
 } from "../constants/mockData";
 
-// 향후 FastAPI: GET /api/bike/seoul/summary
+// GET /bike/seoul/summary
 async function getSummary() {
   try {
-    const { data } = await api.get("/bike/seoul/summary");
-    return data;
-  } catch {
-    return BIKE_HERO_STATS;
+    const response = await api.get("/bike/seoul/summary");
+    const resData = response.data;
+    const summaryData = resData?.data ?? resData;
+
+    const totalBikes = summaryData?.total_bikes ?? 100;
+    const activeStations = summaryData?.active_stations ?? 20;
+
+    const result = [
+      {
+        label: "오늘 총 대여",
+        value: `${totalBikes.toLocaleString()}대`,
+        change: "+8.4%",
+      },
+      {
+        label: "운영 대여소",
+        value: `${activeStations.toLocaleString()}개소`,
+        change: "+2.1%",
+      },
+      {
+        label: "현재 이용 중",
+        value: "4,318대",
+        change: "+12.3%",
+      },
+      {
+        label: "평균 이용 시간",
+        value: "17.4분",
+        change: "-1.8%",
+      },
+    ];
+    return result;
+  } catch (err) {
+    console.error("[Summary API 에러]:", err);
+    return [
+      { label: "오늘 총 대여", value: "100대", change: "0%" },
+      { label: "운영 대여소", value: "20개소", change: "0%" },
+      { label: "현재 이용 중", value: "0대", change: "0%" },
+      { label: "평균 이용 시간", value: "0분", change: "0%" },
+    ];
   }
 }
 
-// 향후 FastAPI: GET /api/bike/seoul/routes
+// GET /bike/seoul/routes
 async function getBikeRoutes() {
   try {
     const { data } = await api.get("/bike/seoul/routes");
-    const rawList = extractData(data, []);
-
-    // 데이터가 비어있다면 Mock 데이터로 대체
-    if (!Array.isArray(rawList) || rawList.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
       return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
     }
-    return rawList;
-  } catch {
+    return data;
+  } catch (err) {
+    console.error("[Routes API 에러]:", err);
     return ROUTES_MOCK.filter((r) => r.bikeType === "따릉이");
   }
 }
 
-// 향후 FastAPI: GET /api/bike/seoul/stations
+// GET /bike/stations
 async function getStations() {
   try {
     const { data } = await api.get("/bike/stations");
@@ -45,17 +77,29 @@ async function getStations() {
       stations: data?.stations ?? STATIONS_MOCK,
       hourlyUsage: data?.hourlyUsage ?? HOURLY_USAGE
     };
-  } catch {
+  } catch (err) {
+    console.error("[Stations API 에러]:", err);
     return { stations: STATIONS_MOCK, hourlyUsage: HOURLY_USAGE };
   }
 }
 
-// 향후 FastAPI: GET /api/ai/bike/analysis
+// GET /ai/bike/analysis 
 async function getAnalysis() {
   try {
-    const { data } = await api.get("/ai/bike/analysis");
-    return data;
-  } catch {
+    const response = await api.get("/ai/bike/analysis");
+
+    const data = response.data;
+    const analysisData = data?.data ?? data; 
+    
+    const result = {
+      monthlyUsage: analysisData?.monthlyUsage ?? MONTHLY_USAGE,
+      topStations: analysisData?.topStations ?? TOP_STATIONS,
+      ageDistribution: analysisData?.ageDistribution ?? AGE_DISTRIBUTION,
+      insights: analysisData?.insights ?? AI_INSIGHTS,
+    };
+    return result;
+  } catch (err) { 
+    console.error("[Analysis API 에러]:", err);
     return {
       monthlyUsage: MONTHLY_USAGE,
       topStations: TOP_STATIONS,
@@ -65,7 +109,7 @@ async function getAnalysis() {
   }
 }
 
-// FastAPI ML 예측 엔드포인트
+// POST /ai/bike/forecast 
 async function getForecast({
   stationId,
   date,
@@ -80,7 +124,7 @@ async function getForecast({
   rolling7dSameHourAvg,
 }) {
   try {
-    const { data } = await api.post("/ai/bike/forecast", {
+    const { data } = await api.post("/ai/bike/forecast", { 
       station_id: stationId,
       date,
       hour,
@@ -95,7 +139,7 @@ async function getForecast({
     });
     return data;
   } catch (err) {
-    
+    console.error("[Forecast API 에러]:", err);
     return mockForecast({
       stationId,
       isHoliday,
@@ -109,7 +153,6 @@ async function getForecast({
   }
 }
 
-// 실제 ML 모델이 붙기 전까지 대여소 정원 대비 예상 수요를 간단히 추정하는 임시 로직.
 function mockForecast({
   stationId,
   isHoliday,
@@ -147,8 +190,10 @@ function mockForecast({
 const publicBikeService = { 
   getSummary, 
   getBikeRoutes, 
-  getRoutes : getBikeRoutes,
+  getRoutes: getBikeRoutes,
   getStations, 
   getAnalysis, 
-  getForecast };
+  getForecast 
+};
+
 export default publicBikeService;
