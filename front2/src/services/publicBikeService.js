@@ -29,7 +29,7 @@ async function getSummary() {
       },
       {
         label: "운영 대여소",
-        value: `${activeStations.toLocaleString()}개소`,
+        value: `${activeStations.toLocaleString()}개`,
         change: "+2.1%",
       },
       {
@@ -67,9 +67,16 @@ async function getBikeRoutes() {
 }
 
 // GET /bike/stations
-async function getStations() {
+async function getStations(lat = null, lng = null) {
   try {
-    const { data } = await api.get("/bike/stations");
+    // 위도와 경도가 있으면 쿼리스트링으로 함께 전송
+    const params = {};
+    if (lat !== null && lng !== null) {
+      params.lat = lat;
+      params.lng = lng;
+    }
+
+    const { data } = await api.get("/bike/stations", { params });
     return {
       stations: data?.stations ?? STATIONS_MOCK,
       hourlyUsage: data?.hourlyUsage ?? HOURLY_USAGE

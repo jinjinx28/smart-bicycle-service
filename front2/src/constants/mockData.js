@@ -306,7 +306,7 @@ export const COMMUNITY_STATS = [
 
 export const BIKE_HERO_STATS = [
   { label: "오늘 총 이용", value: "142,800", unit: "건", trend: "+8.4%" },
-  { label: "운영 대여소", value: "2,692", unit: "개소", trend: "+2.1%" },
+  { label: "운영 대여소", value: "2,692", unit: "개", trend: "+2.1%" },
   { label: "현재 이용 중", value: "4,318", unit: "대", trend: "+12.3%" },
   { label: "평균 이용 시간", value: "17.4", unit: "분", trend: "-1.8%" },
 ];

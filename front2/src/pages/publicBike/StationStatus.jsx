@@ -14,12 +14,35 @@ export default function StationStatus() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    publicBikeService.getStations().then((res) => {
-      setData(res);
-    })
-      .catch(() => {
-        setData({ stations: [], hourlyUsage: [] });
-      });
+    const fetchWithCoords = (lat = 37.4979, lng = 127.0276) => {
+      publicBikeService.getStations(lat, lng)
+        .then((res) => {
+          setData(res);
+        })
+        .catch(() => {
+          setData({ stations: [], hourlyUsage: [] });
+        });
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          fetchWithCoords(lat, lng);
+        },
+        () => {
+          // 권한 거부나 타임아웃 발생 시 경고 로그 없이 강남역 좌표로 대체
+          fetchWithCoords(37.4979, 127.0276);
+        },
+        { 
+          timeout: 3000, 
+          enableHighAccuracy: false 
+        }
+      );
+    } else {
+      fetchWithCoords(37.4979, 127.0276);
+    }
   }, []);
 
   if (!data) return <Loading />;
