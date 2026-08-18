@@ -30,6 +30,8 @@ def load_csv_data_once():
         # 컬럼명 공백 제거 및 안전한 집계 처리
         df.columns = [str(c).strip() for c in df.columns]
 
+        df = df[df['대여소명'].str.contains('강남|역삼|논현|삼성|선릉|도곡|압구정|신사|대치|개포', na=False)]
+
         if '대여소번호' in df.columns and '대여소명' in df.columns:
             agg_dict = {}
             if '이용건수' in df.columns:
