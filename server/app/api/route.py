@@ -12,6 +12,14 @@ def get_routes(type: Optional[str] = Query(None)):
         "data": fetch_bike_routes(type)
     }
 
+@router.get("/routes")
+def get_routes_alias(type: Optional[str] = Query(None)):
+    return {
+        "status": "success",
+        "type": type,
+        "data": fetch_bike_routes(type)
+    }
+
 @router.get("/bike/stations")
 def get_bike_stations():
     return {
