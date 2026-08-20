@@ -42,11 +42,6 @@ def get_bike_summary():
     real_station_count = len(stations)
     total_bikes_count = sum(s.get("available", 0) for s in stations)
 
-    # 🔍 [백엔드 콘솔 로그] 실제 계산된 값 확인
-    print(
-        f"\n[DEBUG 백엔드] 대여소 수: {real_station_count}, 총 자전거 수: {total_bikes_count}\n"
-    )
-
     return {
         "status": "success",
         "data": {
