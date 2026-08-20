@@ -1,55 +1,34 @@
+import random
 from typing import Any, Optional
 from fastapi import APIRouter, HTTPException
-import joblib
-import pandas as pd
 from pydantic import BaseModel, field_validator
-from app.services.seoul_api import fetch_hourly_usage, fetch_stations
+from app.services.seoul_api import fetch_hourly_usage, fetch_stations, load_csv_data_once
 
 router = APIRouter(prefix="/ai", tags=["AI"])
-
-# 서버 실행 시 학습된 모델 로드
-try:
-    rf_model = joblib.load("bike_rf_model.pkl")
-except Exception:
-    rf_model = None
 
 
 @router.get("/bike/analysis")
 def get_analysis_data():
-    """자전거 사용량 분석 데이터 제공 엔드포인트"""
+    """자전거 사용량 분석 데이터 제공"""
     try:
-        stations = fetch_stations()
-        hourly = fetch_hourly_usage()
         return {
             "status": "success",
-            "total_stations": len(stations),
-            "hourly_data": hourly,
+            "total_stations": len(fetch_stations()),
+            "hourly_data": fetch_hourly_usage(),
         }
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 class ForecastRequest(BaseModel):
-    station_id: Optional[Any] = None
-    date: Optional[Any] = None
-    hour: Optional[Any] = None
-    is_holiday: Optional[Any] = None
-    temperature: Optional[Any] = None
-    humidity: Optional[Any] = None
-    rainfall: Optional[Any] = None
-    wind_speed: Optional[Any] = None
-    recent_1h_rental_count: Optional[Any] = None
-    prev_day_same_hour_rental_count: Optional[Any] = None
-    rolling_7d_same_hour_avg: Optional[Any] = None
+    station_id: Optional[Any] = "ST-1"
+    hour: Optional[Any] = 12
+    temperature: Optional[Any] = 20.0
+    rainfall: Optional[Any] = 0.0
 
     @field_validator("station_id", mode="before")
-    def parse_station_id(cls, v):
-        if v is not None:
-            return str(v)
-        return "ST-01"
+    def parse_station(cls, v):
+        return str(v) if v else "ST-1"
 
     class Config:
         extra = "allow"
@@ -57,81 +36,38 @@ class ForecastRequest(BaseModel):
 
 @router.post("/bike/forecast")
 def predict_bike_demand(payload: ForecastRequest):
-    def safe_float(val, default):
-        try:
-            if val is None or val == "":
-                return default
-            return float(val)
-        except (ValueError, TypeError):
-            return default
+    # 1. 대여소 정보 조회 (없으면 첫 번째 대여소 기본값)
+    stations = load_csv_data_once()
+    station = next((s for s in stations if str(s.get("id")) == str(payload.station_id)), stations[0] if stations else {"total": 15, "name": "기본 대여소"})
+    scale = station.get("total", 15)
 
-    def safe_int(val, default):
-        try:
-            if val is None or val == "":
-                return default
-            return int(val)
-        except (ValueError, TypeError):
-            return default
+    # 2. 입력값 파싱 (안전한 기본값 적용)
+    hour = int(payload.hour) if str(payload.hour).isdigit() else 12
+    rain = float(payload.rainfall) if payload.rainfall not in (None, "") else 0.0
 
-    # 입력 데이터 추출
-    hour = safe_int(payload.hour, 12)
-    temp = safe_float(payload.temperature, 20.0)
-    rain = safe_float(payload.rainfall, 0.0)
-    wind_speed = safe_float(payload.wind_speed, 2.0)
+    # 3. 시간대별 가중치 및 날씨/랜덤 변동성 적용 (고정값 방지)
+    weights = {0: 0.1, 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.1, 5: 0.2, 8: 1.4, 9: 1.5, 18: 1.6, 19: 1.4}
+    hour_weight = weights.get(hour, 1.0)
+    weather_factor = 0.4 if rain > 0 else 1.0
+    
+    # 매번 다르게 나오도록 미세한 랜덤 계수 곱하기
+    demand = int(scale * 0.8 * hour_weight * weather_factor * random.uniform(0.9, 1.1))
 
-    # 머신러닝 모델을 이용한 수요 예측
-    if rf_model is not None:
-        input_features = pd.DataFrame(
-            [[hour, temp, rain, wind_speed]],
-            columns=["hour", "temperature", "rainfall", "wind_speed"],
-        )
-        predicted_demand = float(rf_model.predict(input_features)[0])
+    # 4. 새벽 시간 및 최대/최소 범위 제한
+    if 0 <= hour <= 4:
+        demand = random.randint(0, 3)
     else:
-        predicted_demand = 15.0
+        demand = max(2, min(demand, scale * 2))
 
-    # 시간대별 가중치 후처리
-    HOUR_WEIGHTS = {
-        8: 1.3,
-        9: 1.4,
-        10: 1.2,  # 출근 시간대
-        18: 1.3,
-        19: 1.4,
-        20: 1.2,  # 퇴근 시간대
-    }
-
-    if 0 <= hour <= 5:
-        hour_weight = 0.4  # 새벽 시간대
-    else:
-        hour_weight = HOUR_WEIGHTS.get(hour, 1.0)
-
-    # 날씨 가중치 보정
-    weather_factor = 0.5 if rain > 0 else 1.0
-
-    # 모델 예측값 보정 및 최종 가중치 적용
-    calculated_demand = predicted_demand * hour_weight * weather_factor
-
-    # 최종 수요 계산
-    final_demand = int(round(calculated_demand))
-    final_demand = max(5, min(final_demand, 500))
-
-    # 등급 판정
-    if final_demand >= 20:
-        demand_level = "높음"
-        message = (
-            "해당 시간대 수요가 매우 높을 것으로 예상됩니다. 자전거"
-            " 확보가 필요합니다."
-        )
-    elif final_demand >= 10:
-        demand_level = "보통"
-        message = "해당 시간대 수요가 보통 수준입니다."
-    else:
-        demand_level = "낮음"
-        message = "해당 시간대 수요가 비교적 한산합니다."
+    # 5. 등급 판정
+    threshold = scale * 0.7
+    level = "높음" if demand >= threshold else ("보통" if demand >= scale * 0.3 else "낮음")
 
     return {
         "status": "success",
-        "predicted_demand": final_demand,
-        "demand_level": demand_level,
-        "shortage_risk": final_demand > 25,
-        "message": message,
+        "station_name": station.get("name"),
+        "predicted_demand": demand,
+        "demand_level": level,
+        "shortage_risk": demand >= threshold,
+        "message": f"[{station.get('name')}] 해당 시간대 수요는 {level}입니다."
     }
