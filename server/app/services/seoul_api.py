@@ -9,11 +9,12 @@ load_dotenv()
 
 _CACHED_STATIONS: list[dict] = []
 _CACHED_ROUTES: list[dict] = []
+_CACHED_WEATHER: list[dict] = []
 
 DEFAULT_LAT = 37.4979
 DEFAULT_LNG = 127.0276
 
-def find_data_file() -> Path:
+def find_data_file(keyword: str) -> Path:
     current_file = Path(__file__).resolve()
     search_dirs = [current_file.parent, Path.cwd()] + list(current_file.parents)
 
@@ -23,13 +24,10 @@ def find_data_file() -> Path:
         for f in d.iterdir():
             if f.is_file():
                 fn = f.name.lower()
-                if (
-                    ("seoul" in fn or "station" in fn or "따릉이" in fn or "대여소" in fn)
-                    and (fn.endswith(".csv") or fn.endswith(".xlsx") or fn.endswith(".xls"))
-                ):
+                if keyword in fn and (fn.endswith(".csv") or fn.endswith(".xlsx") or fn.endswith(".xls")):
                     return f
 
-    raise FileNotFoundError("파일을 찾을 수 없습니다.")
+    raise FileNotFoundError(f"'{keyword}' 파일을 찾을 수 없습니다.")
 
 def clean_station_name(raw_name: str, fallback_idx: int = 1) -> str:
     if not raw_name or pd.isna(raw_name):
@@ -60,7 +58,7 @@ def load_csv_data_once() -> list[dict]:
     if _CACHED_STATIONS:
         return _CACHED_STATIONS
 
-    target_file = find_data_file()
+    target_file = find_data_file("station")
     try:
         if target_file.name.lower().endswith(('.xlsx', '.xls')):
             df = pd.read_excel(target_file, header=None)
@@ -113,6 +111,21 @@ def load_csv_data_once() -> list[dict]:
 
     _CACHED_STATIONS = stations
     return _CACHED_STATIONS
+
+def fetch_weather_data() -> list[dict]:
+    global _CACHED_WEATHER
+    if _CACHED_WEATHER:
+        return _CACHED_WEATHER
+
+    try:
+        target_file = find_data_file("weather")
+        df = pd.read_csv(target_file, encoding='cp949')
+        df = df.where(pd.notnull(df), None)
+        _CACHED_WEATHER = df.to_dict(orient="records")
+    except Exception:
+        _CACHED_WEATHER = []
+
+    return _CACHED_WEATHER
 
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
@@ -170,10 +183,15 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
     res = _CACHED_ROUTES
     if region and region not in ["전체", "서울", "서울시"]: res = [r for r in res if r["region"] == region]
     if bike_type and bike_type not in ["전체", "personal", "all"]: res = [r for r in res if r["bikeType"] == bike_type]
-    if difficulty and difficulty != "전체": res = [r for r in diffs if r["difficulty"] == difficulty]
+    if difficulty and difficulty != "전체": res = [r for r in res if r["difficulty"] == difficulty]
     return res
 
 def fetch_hourly_usage() -> list[dict]:
     stations = fetch_stations(limit=10)
     base = sum(s.get("available", 0) for s in stations)
     return [{"hour": f"{h:02d}:00", "count": int(max(5, (base + h) % 40))} for h in range(24)]
+
+async def update_weather_cache() -> list[dict]:
+    global _CACHED_WEATHER
+    _CACHED_WEATHER = []
+    return fetch_weather_data()
