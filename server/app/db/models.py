@@ -18,7 +18,7 @@ class User(Base):
 
     # 비밀번호 암호화
     def set_password(self, raw_password: str):
-        self.password = pwd_context.hash(raw_password)
+        self.password = pwd_context.hash(raw_password[:72])
 
     # 비밀번호 검증
     def verify_password(self, raw_password: str) -> bool:
