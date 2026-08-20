@@ -1,3 +1,5 @@
+- *프론트엔드 API 연동 서비스 코드는 /front2/src/services/ 경로에 모두 정상 포함되어 있습니다.*
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
