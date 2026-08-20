@@ -10,7 +10,7 @@ from app.db.models import User
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-# --- Schemas ---
+# --- Pydantic Schemas ---
 class AuthRequest(BaseModel):
     email: Optional[str] = None
     username: Optional[str] = None
