@@ -6,7 +6,7 @@ from app.api import ai, auth, bike, chat, dashboard, route
 from app.db.database import init_db
 from app.services.seoul_api import update_weather_cache
 
-app = FastAPI(title="따릉이 스마트 서비스 API")
+app = FastAPI()
 
 @app.on_event("startup")
 async def on_startup():
