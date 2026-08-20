@@ -11,8 +11,9 @@ _CACHED_STATIONS: list[dict] = []
 _CACHED_ROUTES: list[dict] = []
 _CACHED_WEATHER: list[dict] = []
 
-DEFAULT_LAT = 37.4979
-DEFAULT_LNG = 127.0276
+# 서울 중심부 기본값 (서울시청 기준)
+DEFAULT_LAT = 37.5665
+DEFAULT_LNG = 126.9780
 
 def find_data_file(keyword: str) -> Path:
     current_file = Path(__file__).resolve()
@@ -74,11 +75,7 @@ def load_csv_data_once() -> list[dict]:
     stations = []
     for idx, row in df.iterrows():
         row_values = row.fillna("").values
-        row_str = " ".join([str(v) for v in row_values])
-
-        if "강남" not in row_str:
-            continue
-
+        
         raw_name = str(row_values[1]).strip() if len(row_values) > 1 else ""
         if not raw_name or raw_name in ["보관소(대여소)명", "대여소명"]:
             continue
@@ -166,15 +163,33 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
         stations = fetch_stations(limit=50)
         types = ["로드", "MTB", "그래벨", "투어링", "도심"]
         diffs = ["입문", "중급", "고급", "도전"]
+        
+        base_route_names = [
+            "북한산 순환 코스", "한강 자전거 도로 코스", "남산 북악산 업힐 코스", 
+            "여의도 한강공원 코스", "반포 잠수교 라이딩", "청계천 도심 산책 코스", 
+            "올림픽공원 순환 코스", "양재천 자전거 길", "불광천 코스", "탄천 합수부 코스"
+        ]
+        
         routes = []
         for idx, s in enumerate(stations):
+            route_name = base_route_names[idx % len(base_route_names)]
+            elevation_val = f"{(idx * 45 + 120)}m"
+            time_val = f"{(idx % 2) + 1}시간 {(idx * 15) % 60}분"
+            
             routes.append({
                 "id": idx + 1,
-                "name": f"{s.get('name')} {types[idx % 5]} 코스",
+                "name": f"{s.get('name')} {types[idx % len(types)]} 코스",
                 "region": "서울시",
-                "bikeType": types[idx % 5],
-                "difficulty": diffs[idx % 4],
-                "distance": f"{((idx % 5) + 1) * 2.5:.1f}km",
+                "bikeType": types[idx % len(types)],
+                "difficulty": diffs[idx % len(diffs)],
+                "distance": f"{((idx % 5) + 1) * 3.5:.1f}km",
+                "elevation": elevation_val,
+                "cumulativeElevation": elevation_val,
+                "elevationGain": elevation_val,
+                "time": time_val,
+                "estimatedTime": time_val,
+                "duration": time_val,
+                "rating": round(4.5 + (idx % 5) * 0.1, 1),
                 "stationName": str(s.get("name")),
                 "image": None,
             })
@@ -188,7 +203,6 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
 
 def fetch_hourly_usage() -> list[dict]:
     stations = fetch_stations(limit=10)
-
     total_capacity = sum(s.get("total", 15) for s in stations)
     base_weight = max(10, total_capacity // 5)
     
@@ -203,7 +217,6 @@ def fetch_hourly_usage() -> list[dict]:
         })
         
     return hourly_data
-
 
 async def update_weather_cache() -> list[dict]:
     global _CACHED_WEATHER
