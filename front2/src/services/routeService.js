@@ -34,7 +34,7 @@ async function getRouteDetail(id) {
     const response = await api.get(`/routes/${id}`);
     const data = response.data?.data || response.data;
     return data;
-  } catch {
+  } catch  {
     return ROUTES_MOCK.find((r) => r.id === Number(id)) || ROUTES_MOCK[0];
   }
 }

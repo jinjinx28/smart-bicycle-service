@@ -9,6 +9,7 @@ import Loading from "../../components/common/Loading";
 import routeService from "../../services/routeService";
 import { ROUTES_MOCK } from "../../constants/mockData";
 import { ROUTES } from "../../constants/routes";
+import { useAuth } from "../../context/AuthContext";
 
 const SAFETY_ICONS = [Shield, Battery, Zap, Users];
 
@@ -16,8 +17,11 @@ export default function RouteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [route, setRoute] = useState(null);
+  
+  const { user } = useAuth();
+  const userName = user?.name || user?.username || user?.id || "";
 
-  useEffect(() => {
+  useEffect(() => { 
     setRoute(null);
     routeService.getRouteDetail(id).then((data) => {
       setRoute(data);
@@ -53,9 +57,13 @@ export default function RouteDetail() {
             루트 목록
           </button>
           <Logo />
-          <Button as={Link} to={ROUTES.SIGNUP} size="sm">
-            무료 가입
-          </Button>
+          
+          <div className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 border border-border backdrop-blur-md">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neon text-black font-bold text-xs">
+              {userName ? userName[0] : ""}
+            </span>
+            <span className="text-sm font-medium text-white">{userName}</span>
+          </div>
         </div>
 
         <div className="absolute bottom-8 left-6">

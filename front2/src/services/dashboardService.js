@@ -4,7 +4,7 @@ import { DASHBOARD_STATS, ROUTES_MOCK, QUICK_MENU, COMMUNITY_FEED } from "../con
 // 향후 FastAPI: GET /api/dashboard
 async function getDashboard() {
   try {
-    const { data } = await api.get("/dashboard");
+    const { data } = await api.get("/dashboard/");
     return data;
   } catch {
     return {
