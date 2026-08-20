@@ -188,8 +188,22 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
 
 def fetch_hourly_usage() -> list[dict]:
     stations = fetch_stations(limit=10)
-    base = sum(s.get("available", 0) for s in stations)
-    return [{"hour": f"{h:02d}:00", "count": int(max(5, (base + h) % 40))} for h in range(24)]
+
+    total_capacity = sum(s.get("total", 15) for s in stations)
+    base_weight = max(10, total_capacity // 5)
+    
+    hourly_data = []
+    for h in range(24):
+        sine_wave = math.sin((h - 6) * math.pi / 12)
+        count = int(base_weight + (sine_wave * (base_weight * 0.5)) + (h % 3))
+        
+        hourly_data.append({
+            "hour": f"{h:02d}:00", 
+            "count": int(max(3, count))
+        })
+        
+    return hourly_data
+
 
 async def update_weather_cache() -> list[dict]:
     global _CACHED_WEATHER
