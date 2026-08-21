@@ -202,14 +202,22 @@ def fetch_bike_routes(region: str = None, bike_type: str = None, difficulty: str
     return res
 
 def fetch_hourly_usage() -> list[dict]:
+    """
+    대여소 총 수용량을 바탕으로, 실제 출퇴근 시간대(오전 8~9시, 오후 6~7시)에 
+    이용량이 급증하는 현실적인 시간대별 이용량 패턴을 계산합니다.
+    """
     stations = fetch_stations(limit=10)
     total_capacity = sum(s.get("total", 15) for s in stations)
     base_weight = max(10, total_capacity // 5)
     
     hourly_data = []
     for h in range(24):
-        sine_wave = math.sin((h - 6) * math.pi / 12)
-        count = int(base_weight + (sine_wave * (base_weight * 0.5)) + (h % 3))
+        morning_peak = math.exp(-((h - 8) ** 2) / 4.0) * 1.5
+        
+        evening_peak = math.exp(-((h - 18) ** 2) / 6.0) * 2.0
+        
+        multiplier = 0.6 + morning_peak + evening_peak
+        count = int(base_weight * multiplier + (h % 2))
         
         hourly_data.append({
             "hour": f"{h:02d}:00", 
